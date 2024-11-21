@@ -7,6 +7,7 @@ import platform
 import seckill.settings as utils_settings
 from datetime import datetime
 from selenium import webdriver
+from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,60 +18,61 @@ from time import sleep
 max_retry_count = 30
 # 商品标题
 product_name_title = "超越音符：林俊杰20周年 首部个人传记 - 限量珍藏版 书"
-CHROME_DRIVER = "/opt/homebrew/bin/chromedriver"
-EDGE_DRIVER = "/opt/homebrew/bin/edgedriver"
 
-def default_chrome_path():
+def default_edge_path():
     driver_dir = getattr(utils_settings, "DRIVER_DIR", None)
     if platform.system() == "Windows":
         if driver_dir:
-            return os.path.abspath(os.path.join(driver_dir, "chromedriver.exe"))
-        raise Exception("The chromedriver path attribute is not found.")
+            return os.path.abspath(os.path.join(driver_dir, "msedgedriver.exe"))
+        raise Exception("The msedgedriver path attribute is not found.")
     else:
-        return driver_dir or CHROME_DRIVER
+        return driver_dir or "/opt/homebrew/bin/edgedriver"
 
-class ChromeDrive:
+class EdgeDrive:
 
-    def __init__(self, chrome_path=default_chrome_path(), seckill_time=None, password=None):
-        self.chrome_path = chrome_path
+    def __init__(self, edge_path=default_edge_path(), seckill_time=None, password=None):
+        self.edge_path = edge_path
         self.seckill_time = seckill_time
         self.seckill_time_obj = datetime.strptime(self.seckill_time, '%Y-%m-%d %H:%M:%S.%f')
         self.password = password
 
     def start_driver(self):
         try:
-            driver = self.find_chromedriver()
+            driver = self.find_edgedriver()
             if driver:
                 print("WebDriver initialized successfully.")
             return driver
         except WebDriverException:
-            print("Unable to find chromedriver. Please check the drive path.")
+            print("Unable to find edgedriver. Please check the drive path.")
             return None
 
-    def find_chromedriver(self):
+    def find_edgedriver(self):
         try:
-            driver = webdriver.Chrome()
+            driver = webdriver.Edge()
         except WebDriverException:
             try:
-                driver = webdriver.Chrome(executable_path=self.chrome_path, chrome_options=self.build_chrome_options())
+                driver = webdriver.Edge(executable_path=self.edge_path, options=self.build_edge_options())
             except WebDriverException:
                 raise
         return driver
 
-    def build_chrome_options(self):
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.accept_untrusted_certs = True
-        chrome_options.assume_untrusted_cert_issuer = True
+    def build_edge_options(self):
+        edge_options = EdgeOptions()
+        edge_options.use_chromium = True  # 必须显式设置 Edge 使用 Chromium 内核
+        edge_options.add_argument('--disable-gpu')  # 示例添加一个选项
+        
+        # 添加多个选项
         arguments = [
-            '--no-sandbox', '--disable-impl-side-painting', '--disable-setuid-sandbox', '--disable-seccomp-filter-sandbox',
-            '--disable-breakpad', '--disable-client-side-phishing-detection', '--disable-cast',
-            '--disable-cast-streaming-hw-encoding', '--disable-cloud-import', '--disable-popup-blocking',
-            '--ignore-certificate-errors', '--disable-session-crashed-bubble', '--disable-ipv6',
-            '--allow-http-screen-capture', '--start-maximized'
+            '--no-sandbox', '--disable-extensions', '--disable-popup-blocking',
+            '--ignore-certificate-errors', '--start-maximized'
         ]
+        edge_options.add_experimental_option("excludeSwitches", ["enable-logging"])  # 避免不必要的日志
         for arg in arguments:
-            chrome_options.add_argument(arg)
-        return chrome_options
+            edge_options.arguments.append(arg)
+
+        return edge_options
+
+
 
     def login_with_cookie(self, login_url="https://www.taobao.com"):
         self.driver = self.start_driver()
@@ -99,11 +101,11 @@ class ChromeDrive:
         self.driver.get(login_url)
         while True:
             try:
-                if self.driver.find_element_by_link_text("亲，请登录"):
+                if self.driver.find_element(By.LINK_TEXT, "亲，请登录"):
                     print("请在10秒内扫码登录...")
-                    self.driver.find_element_by_link_text("亲，请登录").click()
+                    self.driver.find_element(By.LINK_TEXT, "亲，请登录").click()
                     sleep(25)
-                    if self.driver.find_element_by_xpath('//*[@id="J_SiteNavMytaobao"]/div[1]/a/span'):
+                    if self.driver.find_element(By.XPATH, '//*[@id="J_SiteNavMytaobao"]/div[1]/a/span'):
                         print("登录成功，保存 Cookies")
                         self.get_cookie()
                         break
@@ -157,10 +159,8 @@ class ChromeDrive:
 
             elif time_diff > 0:
                 print(f"距离抢购时间还有 {time_diff:.3f} 秒，不再刷新页面...")
-                sleep(1)
             else:
                 print("时间到，开始抢购...")
-                
 
     def sec_kill(self):
         self.keep_wait()
@@ -176,8 +176,6 @@ class ChromeDrive:
                 if now >= self.seckill_time_obj:
                     print(f"开始抢购，尝试次数：{retry_count}")
                     try:
-                        
-
                         submit_button = WebDriverWait(self.driver, 5).until(
                             EC.element_to_be_clickable((By.CLASS_NAME, "btn--QDjHtErD"))
                         )

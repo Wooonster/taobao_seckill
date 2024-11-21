@@ -4,6 +4,7 @@ __author__ = 'Jerry'
 import datetime
 from tkinter import *
 from seckill.seckill_taobao import ChromeDrive
+from seckill.edge import EdgeDrive
 
 
 
@@ -12,6 +13,7 @@ def run_killer(txt, txt2):
     password = str(txt2.get())
     print(seckill_time, password)
     ChromeDrive(seckill_time = seckill_time, password = password).sec_kill()
+    # EdgeDrive(seckill_time = seckill_time, password = password).sec_kill()
 
 
 
